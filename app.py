@@ -195,40 +195,33 @@ def register():
 
 
 @app.route('/api/login', methods=['POST'])
-@limiter.limit("10 per minute") # Max 10 attempts per minute
+@limiter.limit("10 per minute")
 def login():
-    # DEBUGGING: Print what the server received
-    print("--- LOGIN ATTEMPT ---")
-    print("Raw Data:", request.data)
-    print("JSON Data:", request.get_json(silent=True))
-    
     data = request.get_json()
     
     if not data:
-        print("Error: No JSON data found")
         return jsonify({"error": "Missing JSON data"}), 400
 
     username = data.get('username')
     password = data.get('password')
     
     if not username or not password:
-        print("Error: Missing username or password")
         return jsonify({"error": "Missing fields"}), 400
 
+    conn = None
     try:
-        # CORRECT: Use the same valid connection string as your register function
+        # Connect to DB
         conn = psycopg2.connect(os.getenv('DATABASE_URL'))
         cur = conn.cursor()
 
-        # 1. Fetch the hash string stored in the DB
+        # 1. Fetch the hash
         cur.execute("SELECT id, password_hash FROM users WHERE username = %s", (username,))
         user_row = cur.fetchone()
         cur.close()
-        conn.close()
-
+        
+        # 2. Verify
         if user_row:
             user_id, stored_hash = user_row
-            # 2. Use Python to compare the input password with the stored hash
             if check_password_hash(stored_hash, password):
                 session['user_id'] = user_id
                 session['username'] = username
@@ -237,8 +230,11 @@ def login():
         return jsonify({"error": "Invalid credentials"}), 401
 
     except Exception as e:
-        print("Login error:", e)
-        return jsonify({"error": str(e)}), 500
+        print("Login error:", e) # It is safe to print system errors, just not user data
+        return jsonify({"error": "Server Error"}), 500
+    finally:
+        if conn:
+            conn.close()
 
 @app.route('/api/rooms', methods=['GET'])
 def get_rooms():
