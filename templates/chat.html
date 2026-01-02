@@ -736,6 +736,13 @@
 
             // 6. Add to the chat feed
             feed.appendChild(row);
+
+            // --- NEW PERFORMANCE FIX: LIMIT DOM ELEMENTS ---
+            while (feed.children.length > 400) {
+                feed.removeChild(feed.firstChild);
+            }
+            // -----------------------------------------------
+
             feed.scrollTop = feed.scrollHeight;
         }
 
