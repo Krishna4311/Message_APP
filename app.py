@@ -390,13 +390,17 @@ def handle_send(data):
     active_key_record = get_or_create_active_key(room_id)
     cipher = Fernet(active_key_record.temp_raw_value)
     
+    now = datetime.utcnow()
+    
     packet = {
-        "id": str(uuid.uuid4()),  # <--- UNIQUE ID
-        "room_id": room_id,      # <--- ADD THIS LINE !!!
+        "id": str(uuid.uuid4()),
+        "room_id": room_id,
         "sender": sender,
         "message": msg_text,
-        "time": datetime.now().strftime("%I:%M %p"),
-        "date": datetime.now().strftime("%Y-%m-%d")
+        "time": now.strftime("%I:%M %p"), # Still needed for fallback
+        "date": now.strftime("%Y-%m-%d"),
+        # This sends the UTC timestamp to the browser so it can convert it
+        "raw_time": now.isoformat() + "Z" 
     }
     encrypted_bytes = cipher.encrypt(json.dumps(packet).encode())
     encrypted_str = encrypted_bytes.decode()
