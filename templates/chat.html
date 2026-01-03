@@ -330,6 +330,42 @@
             text-shadow: 0 0 5px var(--terminal-green);
         }
 
+        /* --- CSS UPDATE --- */
+        .date-block {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            /* Maintains spacing between messages */
+            position: relative;
+        }
+
+        .date-separator {
+            position: sticky;
+            top: 10px;
+            /* Sticking distance from top */
+            z-index: 50;
+            /* High z-index to stay above messages */
+            display: flex;
+            justify-content: center;
+            margin-bottom: 10px;
+            pointer-events: none;
+            /* Let clicks pass through */
+        }
+
+        .date-badge {
+            background-color: #000;
+            /* Solid Black background is CRITICAL to cover text behind it */
+            border: 1px solid var(--terminal-green);
+            color: var(--terminal-green);
+            padding: 4px 12px;
+            font-size: 14px;
+            border-radius: 12px;
+            font-family: 'VT323', monospace;
+            text-transform: uppercase;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.9);
+            /* Shadow helps separation */
+        }
+
         @media (max-width: 768px) {
             #sidebar {
                 position: absolute;
@@ -465,6 +501,30 @@
         let currentUser = null;
         let currentRoomId = null;
         let roomToDeleteId = null;
+
+        // --- NEW/UPDATED VARIABLES ---
+        let lastRenderedDate = null;
+        let currentDateBlock = null; // Tracks the current <div> group for the date
+
+        // --- NEW HELPER FUNCTION ---
+        function getFriendlyDateLabel(dateStr) {
+            // dateStr comes from backend as "YYYY-MM-DD"
+            const dateObj = new Date(dateStr);
+            const today = new Date();
+            const yesterday = new Date();
+            yesterday.setDate(today.getDate() - 1);
+
+            // Reset times to midnight for accurate comparison
+            const d = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+            const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const y = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+
+            if (d.getTime() === t.getTime()) return "TODAY";
+            if (d.getTime() === y.getTime()) return "YESTERDAY";
+
+            // Otherwise return date string
+            return dateStr;
+        }
 
         window.onload = function () {
             const savedUser = localStorage.getItem("ghost_user");
@@ -644,6 +704,11 @@
             document.getElementById("current-room-label").innerText = roomName;
             document.getElementById("chat-feed").innerHTML = "";
 
+            // --- RESET TRACKERS ---
+            lastRenderedDate = null;
+            currentDateBlock = null;
+            // ----------------------
+
             if (window.innerWidth <= 768) {
                 document.getElementById("sidebar").classList.remove("open");
             }
@@ -694,54 +759,65 @@
 
         function appendMessage(data) {
             // 1. REPLAY CHECK
-            if (data.id && seenMessageIds.has(data.id)) {
-                console.warn("Replay attack detected or duplicate message ignored.");
-                return;
-            }
+            if (data.id && seenMessageIds.has(data.id)) return;
             if (data.id) seenMessageIds.add(data.id);
 
             const feed = document.getElementById("chat-feed");
+
+            // --- START: DATE GROUPING LOGIC ---
+            // If date changed OR we don't have a block yet, create a new block
+            if (data.date && data.date !== lastRenderedDate) {
+
+                // 1. Create the container for this specific date
+                currentDateBlock = document.createElement("div");
+                currentDateBlock.className = "date-block";
+                feed.appendChild(currentDateBlock); // Add block to main feed
+
+                // 2. Create the Sticky Header inside this block
+                const separatorDiv = document.createElement("div");
+                separatorDiv.className = "date-separator";
+
+                const badgeSpan = document.createElement("span");
+                badgeSpan.className = "date-badge";
+                badgeSpan.innerText = getFriendlyDateLabel(data.date);
+
+                separatorDiv.appendChild(badgeSpan);
+                currentDateBlock.appendChild(separatorDiv);
+
+                // 3. Update tracker
+                lastRenderedDate = data.date;
+            }
+            // --- END: DATE GROUPING LOGIC ---
+
             const isMine = (data.sender === currentUser.username);
 
-            // 1. Create the main Row container
+            // Create Message Row
             const row = document.createElement("div");
             row.className = `message-row ${isMine ? 'mine' : 'theirs'}`;
 
-            // 2. Create the Sender Name element
             const senderDiv = document.createElement("div");
             senderDiv.className = "sender-name";
-            senderDiv.textContent = data.sender; // Safe (Text only)
+            senderDiv.textContent = data.sender;
 
-            // 3. Create the Bubble element
             const bubbleDiv = document.createElement("div");
             bubbleDiv.className = "bubble";
+            bubbleDiv.appendChild(document.createTextNode(data.message));
 
-            // --- SECURITY CORE ---
-            // Instead of innerHTML, we create a Text Node.
-            // This forces the browser to escape characters like < and >
-            const messageText = document.createTextNode(data.message);
-            bubbleDiv.appendChild(messageText);
-
-            // 4. Create the Timestamp element
             const timeSpan = document.createElement("span");
             timeSpan.className = "timestamp";
-            timeSpan.textContent = data.time; // Safe
+            timeSpan.textContent = data.time;
 
-            // Add timestamp inside the bubble (after the message text)
             bubbleDiv.appendChild(timeSpan);
-
-            // 5. Assemble everything
             row.appendChild(senderDiv);
             row.appendChild(bubbleDiv);
 
-            // 6. Add to the chat feed
-            feed.appendChild(row);
-
-            // --- NEW PERFORMANCE FIX: LIMIT DOM ELEMENTS ---
-            while (feed.children.length > 400) {
-                feed.removeChild(feed.firstChild);
+            // CRITICAL CHANGE: Append to the Date Block, NOT the main feed
+            if (currentDateBlock) {
+                currentDateBlock.appendChild(row);
+            } else {
+                // Fallback just in case (should rarely happen)
+                feed.appendChild(row);
             }
-            // -----------------------------------------------
 
             feed.scrollTop = feed.scrollHeight;
         }
