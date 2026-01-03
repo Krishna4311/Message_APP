@@ -354,7 +354,15 @@ def delete_room(room_id):
 
 @app.route('/api/history/<int:room_id>')
 def get_history(room_id):
-    messages = Message.query.filter_by(room_id=room_id).limit(50).all()
+    # 1. Get the LAST 50 messages (Order by ID Descending)
+    messages = Message.query.filter_by(room_id=room_id)\
+        .order_by(Message.id.desc())\
+        .limit(50)\
+        .all()
+    
+    # 2. Reverse them so they appear chronologically (Old -> New) in the chat
+    messages.reverse()
+    
     return jsonify([msg.to_dict() for msg in messages])
 
 @socketio.on('join')
