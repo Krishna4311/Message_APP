@@ -87,17 +87,15 @@ class Message(db.Model):
         try:
             key_record = db.session.get(RoomKey, self.key_id)
             if not key_record:
-                return {"sender": "System", "message": "[Key Lost]", "time": ""}
+                return {"sender": "System", "message": "[Key Lost]", "raw_time": self.timestamp.isoformat() + "Z"}
             
-            # --- UPDATE START ---
             # Decrypt the stored Room Key using the Master Key
             try:
                 raw_room_key = master_cipher.decrypt(key_record.key_value.encode()).decode()
             except:
-                return {"sender": "System", "message": "[Key Corrupted]", "time": ""}
+                return {"sender": "System", "message": "[Key Corrupted]", "raw_time": self.timestamp.isoformat() + "Z"}
             
             cipher = Fernet(raw_room_key)
-            # --- UPDATE END ---
 
             decrypted_json_str = cipher.decrypt(self.encrypted_content.encode()).decode()
             packet = json.loads(decrypted_json_str)
@@ -105,11 +103,12 @@ class Message(db.Model):
             return {
                 "sender": self.sender,
                 "message": packet.get("message"),
-                "time": self.timestamp.strftime("%I:%M %p"),
+                # ADD 'Z' so the browser knows this is UTC time
+                "raw_time": self.timestamp.isoformat() + "Z", 
                 "date": self.timestamp.strftime("%Y-%m-%d")
             }
         except Exception as e:
-            return {"sender": "System", "message": "[Decryption Error]", "time": ""}
+            return {"sender": "System", "message": "[Error]", "raw_time": datetime.utcnow().isoformat() + "Z"}
 
 with app.app_context():
     db.create_all()

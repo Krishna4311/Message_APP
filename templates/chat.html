@@ -810,9 +810,25 @@
             bubbleDiv.className = "bubble";
             bubbleDiv.appendChild(document.createTextNode(data.message));
 
+            // 4. Create the Timestamp element (UPDATED)
             const timeSpan = document.createElement("span");
             timeSpan.className = "timestamp";
-            timeSpan.textContent = data.time;
+
+            // --- NEW TIME CONVERSION LOGIC ---
+            if (data.raw_time) {
+                // Create a Date object from the UTC string
+                const dateObj = new Date(data.raw_time);
+
+                // Convert to local readable time (e.g., "06:30 PM")
+                timeSpan.textContent = dateObj.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } else {
+                // Fallback if raw_time is missing
+                timeSpan.textContent = data.time || "";
+            }
+            // -------------------------------
 
             bubbleDiv.appendChild(timeSpan);
             row.appendChild(senderDiv);
