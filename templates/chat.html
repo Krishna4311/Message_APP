@@ -215,7 +215,14 @@
             border: 1px solid var(--terminal-dim);
             background: #000;
             box-shadow: 4px 4px 0px #111;
+
+            /* --- ADD/UPDATE THESE 3 LINES --- */
             word-wrap: break-word;
+            /* Existing: Breaks normal long words */
+            overflow-wrap: break-word;
+            /* Standard: Ensures text stays inside */
+            word-break: break-all;
+            /* CRITICAL: Forces "kkkkk..." to snap to next line */
         }
 
         .timestamp {
